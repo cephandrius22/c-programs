@@ -6,7 +6,8 @@
 #include <pwd.h>
 #include <grp.h>
 #include <string.h>
-
+#include <errno.h>
+#include <sys/syslimits.h>
 
 /*
  * Write the given file mode and permissions to a string buffer.
@@ -49,18 +50,38 @@ int main(int argc, char *argv[]) {
     struct stat statbuf;
     struct passwd *pwd;
     struct group *grp;
+    char relative_path[PATH_MAX * 2];
     int rc;
 
-    dir = opendir(".");
+    char *path;
+    if (argc > 1) {
+        path = argv[1];
+    } else {
+        path = ".";
+    }
+    printf("path is: %s\n", path);
+
+    dir = opendir(path);
     if (dir == NULL) {
         perror("Failed to open directory");
         exit(1);
     }
 
+    size_t path_len = strlen(path);
+
     while ((dirent = readdir(dir)) != NULL) {
-        rc = stat(dirent->d_name, &statbuf);
+        // We need to prepend the path name that was given as an arg, then
+        // add two bytes for the '/' and the null-terminator.
+        snprintf(relative_path,
+            path_len + strlen(dirent->d_name) + 2,
+            "%s/%s",
+            path, dirent->d_name);
+        // printf("realtive path: %s\n", relative_path);
+
+        rc = stat(relative_path, &statbuf);
         if (rc != 0) {
             // TODO: print an error
+            printf("errno: %d\n",errno);
             continue;
         }
 
